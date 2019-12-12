@@ -11,7 +11,6 @@ library(shiny)
 library("shinyWidgets")
 library(stringr)
 options(shiny.maxRequestSize=1000*1024^2)
-install.packages("stringr")
 
 # Define UI for data upload app ----
 ui <- fluidPage(
@@ -132,83 +131,67 @@ server <- function(input, output, session) {
     output$test <- renderPrint({"attente tri"})
     data2 <- reactiveValues()
     observeEvent(input$sort, {
-        if (input$radio ==1) {
-            if (input$slider1>0) {
-                memory <- c(input$text1, input$text2, input$text3, input$text4, input$text5,input$text6)
-                for (i in 1:input$slider1) {
-                    data$table[,i+2] <- str_detect(data$table[,2] ,memory[i])
-                }
-                data$table[,input$slider1+3] <- F
-                progress <- shiny::Progress$new()
-                on.exit(progress$close())
-                progress$set(message = "tri database", value = 0)
-                for (i in 1:input$slider1) {
-                    for (j in 1:nrow(data$table)) {
-                        if (data$table[j,(i+2)]){data$table[j,(input$slider1+3)] <- T}
-                        progress$inc(1/(input$slider1*nrow(data$table)), detail = paste("Doing step", i,"part",j))
-                    }
-                }
-                if(input$checkbox){
-                    for (j in 1:nrow(data$table)) {
-                        if (str_detect(str_sub(data$table[j,2],str_length(data$table[j,2])-2,str_length(data$table[j,2])),"na")){data$table[j,(input$slider1+3)] <- T}  
-                    }
-                }
-                
+        if (input$radio ==1) { # Predefini OR, RR
+            
+            memory <- c(" or ", " rr ", "relative risk"," odd ","odds")
+            for (i in 1:5) {
+                data$table[,i+2] <- str_detect(data$table[,2] ,memory[i])
             }
-            if (input$slider1==0) {
-                sendSweetAlert(
-                    session = session,
-                    title = "Error !",
-                    text = "choose at least 1 word!",
-                    type = "error"
-                )  
-                
-            }
-        }
-        if (input$radio !=1) {
-            if (input$slider1>0) {
-                memory <- c(input$text1, input$text2, input$text3, input$text4, input$text5,input$text6)
-                for (i in 1:input$slider1) {
-                    data$table[,i+2] <- str_detect(data$table[,2] ,memory[i])
+            data$table[,5+3] <- F
+            progress <- shiny::Progress$new()
+            on.exit(progress$close())
+            progress$set(message = "tri database", value = 0)
+            for (i in 1:5) {
+                for (j in 1:nrow(data$table)) {
+                    if (data$table[j,(i+2)]){data$table[j,(5+3)] <- T}
+                    progress$inc(1/(5*nrow(data$table)), detail = paste("Doing step", i,"part",j))
                 }
-                data$table[,input$slider1+3] <- F
-                progress <- shiny::Progress$new()
-                on.exit(progress$close())
-                progress$set(message = "tri database", value = 0)
-                for (i in 1:input$slider1) {
-                    for (j in 1:nrow(data$table)) {
-                        if (data$table[j,(i+2)]){data$table[j,(input$slider1+3)] <- T}
-                        progress$inc(1/(input$slider1*nrow(data$table)), detail = paste("Doing step", i,"part",j))
-                    }
-                }
-                if(input$checkbox){
-                    for (j in 1:nrow(data$table)) {
-                        if (str_detect(str_sub(data$table[j,2],str_length(data$table[j,2])-2,str_length(data$table[j,2])),"na")){data$table[j,(input$slider1+3)] <- T}  
-                    }
-                }
-                
             }
-            if (input$slider1==0) {
-                sendSweetAlert(
-                    session = session,
-                    title = "Error !",
-                    text = "choose at least 1 word!",
-                    type = "error"
-                )  
-                
-            }
-        }
-        data2$tri <- subset(data$table, data$table[,(input$slider1+3)] == F)
-        #           names(data2$tri<- c("uid","abstract",memory,"to remove"))
-        data2$tri2 <- data2$tri[,1:2]
-        sendSweetAlert(
-            session = session,
-            title = "Done !",
-            text = "La base a bien ete triee !",
-            type = "success"
-        )   
-        
-        
+        } 
+        #     if (input$radio !=1) {
+        #         if (input$slider1>0) {
+        #             memory <- c(input$text1, input$text2, input$text3, input$text4, input$text5,input$text6)
+        #             for (i in 1:input$slider1) {
+        #                 data$table[,i+2] <- str_detect(data$table[,2] ,memory[i])
+        #             }
+        #             data$table[,input$slider1+3] <- F
+        #             progress <- shiny::Progress$new()
+        #             on.exit(progress$close())
+        #             progress$set(message = "tri database", value = 0)
+        #             for (i in 1:input$slider1) {
+        #                 for (j in 1:nrow(data$table)) {
+        #                     if (data$table[j,(i+2)]){data$table[j,(input$slider1+3)] <- T}
+        #                     progress$inc(1/(input$slider1*nrow(data$table)), detail = paste("Doing step", i,"part",j))
+        #                 }
+        #             }
+        #             if(input$checkbox){
+        #                 for (j in 1:nrow(data$table)) {
+        #                     if (str_detect(str_sub(data$table[j,2],str_length(data$table[j,2])-2,str_length(data$table[j,2])),"na")){data$table[j,(input$slider1+3)] <- T}  
+        #                 }
+        #             }
+        #             
+        #         }
+        #         if (input$slider1==0) {
+        #             sendSweetAlert(
+        #                 session = session,
+        #                 title = "Error !",
+        #                 text = "choose at least 1 word!",
+        #                 type = "error"
+        #             )  
+        #             
+        #         }
+        #     }
+            data2$tri <- subset(data$table, data$table[,8] == T)
+            #           names(data2$tri<- c("uid","abstract",memory,"to remove"))
+            data2$tri2 <- data2$tri[,1:2]
+            sendSweetAlert(
+                session = session,
+                title = "Done !",
+                text = "La base a bien ete triee !",
+                type = "success"
+            )
+
+
     })
     date_jour <- str_sub(date(),start = 9,end = 10)
     date_mois <- str_sub(date(),start = 5,end = 7)

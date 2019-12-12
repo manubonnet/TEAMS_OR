@@ -11,7 +11,7 @@ library(shiny)
 library("shinyWidgets")
 library(stringr)
 options(shiny.maxRequestSize=1000*1024^2)
-
+install.packages("stringr")
 
 # Define UI for data upload app ----
 ui <- fluidPage(
@@ -132,7 +132,7 @@ server <- function(input, output, session) {
     output$test <- renderPrint({"attente tri"})
     data2 <- reactiveValues()
     observeEvent(input$sort, {
-        if (input$radio =1) {
+        if (input$radio ==1) {
             if (input$slider1>0) {
                 memory <- c(input$text1, input$text2, input$text3, input$text4, input$text5,input$text6)
                 for (i in 1:input$slider1) {

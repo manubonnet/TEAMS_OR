@@ -61,49 +61,47 @@ ui <- fluidPage(
     
     # Main panel for displaying outputs ----
     mainPanel(
-      
-      # Output: Data file ----
-      # tableOutput("contents"),
-      fluidRow(
-        radioButtons("radio", label = h3("Choix du tri"),
-                     choices = list("Predefini (OR, RR...)" = 1, "Personalise" = 2, "les deux" = 3), 
-                     selected = 1, inline = T)),
-      fluidRow(
-        conditionalPanel(
-          condition = "input.radio !=1",     
-          sliderInput("slider1", label = h3("Nombre de termes a garder"), min = 0, 
-                      max = 6, value = 0),
-          column(4,
-                 conditionalPanel(
-                   condition = "input.slider1 > 0",
-                   textInput("text1", label = h3("mot a garder 1"), value = "NULL")),
-                 conditionalPanel(
-                   condition = "input.slider1 > 3",
-                   textInput("text4", label = h3("mot a garder 4"), value = "NULL"))),
-          
-          column(4,
-                 conditionalPanel(
-                   condition = "input.slider1 > 1",
-                   textInput("text2", label = h3("mot a garder 2"), value = "NULL")),
-                 conditionalPanel(
-                   condition = "input.slider1 > 4",
-                   textInput("text5", label = h3("mot a garder 5"), value = "NULL"))),
-          column(4,
-                 conditionalPanel(
-                   condition = "input.slider1 > 2",
-                   textInput("text3", label = h3("mot a garder 3"), value = "NULL")),
-                 conditionalPanel(
-                   condition = "input.slider1 > 5",
-                   textInput("text6", label = h3("mot a garder 6"), value = "NULL"))))),
-      fluidRow(
-        actionButton(inputId = "sort", label = "tri"),
-        h3("nombre d\'articles avant tri"),
-        verbatimTextOutput("avant_tri"),
-        h3("nombre d\'articles apres tri"),
-        verbatimTextOutput("tri"),
-        downloadButton("downloadData", "Download") 
-        
-        
+      conditionalPanel("input.sauve",  
+                       # Output: Data file ----
+                       # tableOutput("contents"),
+                       fluidRow(
+                         radioButtons("radio", label = h3("Choix du tri"),
+                                      choices = list("Predefini (OR, RR...)" = 1, "Personalise" = 2, "les deux" = 3), 
+                                      selected = 1, inline = T)),
+                       fluidRow(
+                         conditionalPanel(
+                           condition = "input.radio !=1",     
+                           sliderInput("slider1", label = h3("Nombre de termes a garder"), min = 0, 
+                                       max = 6, value = 0),
+                           column(4,
+                                  conditionalPanel(
+                                    condition = "input.slider1 > 0",
+                                    textInput("text1", label = h3("mot a garder 1"), value = "NULL")),
+                                  conditionalPanel(
+                                    condition = "input.slider1 > 3",
+                                    textInput("text4", label = h3("mot a garder 4"), value = "NULL"))),
+                           
+                           column(4,
+                                  conditionalPanel(
+                                    condition = "input.slider1 > 1",
+                                    textInput("text2", label = h3("mot a garder 2"), value = "NULL")),
+                                  conditionalPanel(
+                                    condition = "input.slider1 > 4",
+                                    textInput("text5", label = h3("mot a garder 5"), value = "NULL"))),
+                           column(4,
+                                  conditionalPanel(
+                                    condition = "input.slider1 > 2",
+                                    textInput("text3", label = h3("mot a garder 3"), value = "NULL")),
+                                  conditionalPanel(
+                                    condition = "input.slider1 > 5",
+                                    textInput("text6", label = h3("mot a garder 6"), value = "NULL"))))),
+                       fluidRow(
+                         actionButton(inputId = "sort", label = "tri"),
+                         conditionalPanel("input.sort",
+                                          h3(textOutput("tri")),
+                                          downloadButton("downloadData", "Download") 
+                         )
+                       )
       )
     )
     
@@ -116,6 +114,14 @@ server <- function(input, output, session) {
   data = reactiveValues()
   
   observeEvent(input$sauve, {
+    sendSweetAlert(
+      session = session,
+      btn_labels = NA,
+      title = "Saving database",
+      text = "Please wait until \"Done !\" appears on your screen.",
+      closeOnClickOutside = F,
+      type = "warning"
+    )
     data$table = read.csv(input$file1$datapath,
                           header = input$header,
                           sep = input$sep,
@@ -123,7 +129,7 @@ server <- function(input, output, session) {
     sendSweetAlert(
       session = session,
       title = "Done !",
-      text = "Le fichier a bien ete enregistre !",
+      text = "Database saved !",
       type = "success"
     )  
     
@@ -131,6 +137,7 @@ server <- function(input, output, session) {
   output$test <- renderPrint({"attente tri"})
   data2 <- reactiveValues()
   observeEvent(input$sort, {
+    lin_av <- "????"
     if (input$radio ==1 ||input$radio == 3 ) { # Predefini OR, RR
       
       memory <- c(" or ", " rr ", "relative risk"," odd ","odds")
@@ -189,7 +196,7 @@ server <- function(input, output, session) {
     }
     
     if (input$radio == 1) {
-    data2$tri <- subset(data$table, data$table[,8] == T)
+      data2$tri <- subset(data$table, data$table[,8] == T)
     }
     if (input$radio == 2) {
       data2$tri <- subset(data$table, data$table[,(input$slider1+3)] == T)
@@ -218,8 +225,8 @@ server <- function(input, output, session) {
   observeEvent(input$sort, {
     output$test <-renderPrint({
       head(data2$tri2)})
-    output$avant_tri <-renderPrint({nrow(data$table)})
-    output$tri <-renderPrint({nrow(data2$tri)})
+    output$avant_tri <-renderText({paste(nrow(data$table),"articles before sorting")})
+    output$tri <-renderText({paste(nrow(data$table),"articles before sorting, and",nrow(data2$tri),"articles after sorting.")})
     value$download <- 1
     
   })

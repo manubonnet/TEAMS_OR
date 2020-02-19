@@ -206,6 +206,7 @@ server <- function(input, output, session) {
     }
     #           names(data2$tri<- c("uid","abstract",memory,"to remove"))
     data2$tri2 <- data2$tri[,1:2]
+    names(data2$tri2)<- c("Pubmed uID","Title and Abstract")
     sendSweetAlert(
       session = session,
       title = "Done !",
@@ -235,7 +236,7 @@ server <- function(input, output, session) {
       name_id
     },
     content = function(file) {
-      write.csv(data2$tri2, file, row.names = FALSE)
+      write.table(data2$tri2, file, row.names = FALSE, sep = ";")
     }
   )
   

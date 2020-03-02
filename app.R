@@ -131,7 +131,8 @@ ui <- fluidPage(
 
 # Define server logic to read selected file ----
 server <- function(input, output, session) {
-  
+  name_RF= reactiveValues()
+  name_RF <- "RF"
   data = reactiveValues()
   
   observeEvent(input$sauve, {
@@ -147,6 +148,10 @@ server <- function(input, output, session) {
                           header = input$header,
                           sep = input$sep,
                           quote = input$quote)
+    name_RF <- str_split(input$file1$name, "_", simplify = TRUE)[2]
+    output$name_RF <- renderText(name_RF)
+    outputOptions(output, "name_RF", suspendWhenHidden = FALSE)
+    print(name_RF)
     extract<- data$table
     a <- entrez_search(db = "pubmed", term = paste(extract[,1],collapse = " ") ,use_history = T) 
     
@@ -273,15 +278,25 @@ server <- function(input, output, session) {
       text = "La base a bien ete triee !",
       type = "success"
     )
-    
+    date_jour <- str_sub(date(),start = 9,end = 10)
+    date_mois <- str_sub(date(),start = 5,end = 7)
+    date_annee <- str_sub(date(),start = 21,end = 24)
+    date_heure <- str_c(str_sub(date(),start = 12,end = 13),"h", str_sub(date(),start = 15,end = 16))
+    name_RF2 <- str_split(input$file1$name, "_", simplify = TRUE)[2]
+    name_id <- str_c("shiny.stepOR_",name_RF2,"_",date_jour,"_",date_mois, "_" , date_annee,"_" ,date_heure,".csv")
+    print(name_id)
+    #name_id <- isolate(name_id)
+    output$downloadData <- downloadHandler(
+      filename = function() {
+        name_id
+      },
+      content = function(file) {
+        write.table(data2$tri2, file, row.names = FALSE, sep = ";")
+      }
+    )
     
   })
-  date_jour <- str_sub(date(),start = 9,end = 10)
-  date_mois <- str_sub(date(),start = 5,end = 7)
-  date_annee <- str_sub(date(),start = 21,end = 24)
-  date_heure <- str_c(str_sub(date(),start = 12,end = 13),"h", str_sub(date(),start = 15,end = 16))
-  
-  name_id <- str_c("shiny.stepOR_",date_jour,"_",date_mois, "_" , date_annee,"_" ,date_heure,".csv")
+
   value <- reactiveValues(download = 0)
   observeEvent(input$sort, {
     output$test <-renderPrint({
@@ -291,14 +306,7 @@ server <- function(input, output, session) {
     value$download <- 1
     
   })
-  output$downloadData <- downloadHandler(
-    filename = function() {
-      name_id
-    },
-    content = function(file) {
-      write.table(data2$tri2, file, row.names = FALSE, sep = ";")
-    }
-  )
+
   
 }
 # Create Shiny app ----

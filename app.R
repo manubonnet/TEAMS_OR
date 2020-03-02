@@ -5,7 +5,29 @@
 # Find out more about building applications with Shiny here:
 #
 #    http://shiny.rstudio.com/
-#
+#library(backports)
+if (!require("devtools"))
+  install.packages("devtools")
+if (!require("processx"))
+  install.packages("processx")
+#install.packages("nlme")
+library(nlme)
+if (!require("scales"))
+  install.packages("scales")
+library("devtools")
+library(rentrez)
+library("XML")
+#install.packages("reutils",check_built=T)
+# library(reutils)
+
+library(lubridate)
+#devtools::install_github("gschofl/reutils")
+set_entrez_key("2f426efbccf334610530e682833b93e33508")
+Sys.getenv("ENTREZ_KEY")
+options("scipen"=100)
+options(reutils.api.key = "34ad5abbcddf5a94d9dbfb34ad005be64d0a")
+options(reutils.email = "emmanuelbeaunez@gmail.com")
+#rsconnect::appDependencies()
 
 library(shiny)
 library("shinyWidgets")
@@ -31,28 +53,27 @@ ui <- fluidPage(
                            "text/comma-separated-values,text/plain",
                            ".csv")),
       
-      # Horizontal line ----
-      tags$hr(),
-      
       # Input: Checkbox if file has header ----
       checkboxInput("header", "Header", TRUE),
+      fluidRow(
+        column(6,
+               # Input: Select separator ----
+               radioButtons("sep", "Separator",
+                            choices = c(Comma = ",",
+                                        Semicolon = ";",
+                                        Tab = "\t"),
+                            selected = ",")     
+        ),
+        column(6,
+               # Input: Select quotes ----
+               radioButtons("quote", "Quote",
+                            choices = c(None = "",
+                                        "Double Quote" = '"',
+                                        "Single Quote" = "'"),
+                            selected = '"')
+        )
+      ),
       
-      # Input: Select separator ----
-      radioButtons("sep", "Separator",
-                   choices = c(Comma = ",",
-                               Semicolon = ";",
-                               Tab = "\t"),
-                   selected = ","),
-      
-      # Input: Select quotes ----
-      radioButtons("quote", "Quote",
-                   choices = c(None = "",
-                               "Double Quote" = '"',
-                               "Single Quote" = "'"),
-                   selected = '"'),
-      
-      # Horizontal line ----
-      tags$hr(),
       
       # Input: Select number of rows to display ----
       actionButton(inputId = "sauve", label = "sauvegarde")
@@ -71,12 +92,12 @@ ui <- fluidPage(
                        fluidRow(
                          conditionalPanel(
                            condition = "input.radio !=1",     
-                           sliderInput("slider1", label = h3("Nombre de termes a garder"), min = 0, 
-                                       max = 6, value = 0),
+                           sliderInput("slider1", label = h3("Nombre de termes a garder"), min = 1, 
+                                       max = 6, value = 1),
                            column(4,
                                   conditionalPanel(
                                     condition = "input.slider1 > 0",
-                                    textInput("text1", label = h3("mot a garder 1"), value = "NULL")),
+                                    textInput("text1", label = h3("mot a garder 1"), value = "Enter a word")),
                                   conditionalPanel(
                                     condition = "input.slider1 > 3",
                                     textInput("text4", label = h3("mot a garder 4"), value = "NULL"))),
@@ -126,6 +147,32 @@ server <- function(input, output, session) {
                           header = input$header,
                           sep = input$sep,
                           quote = input$quote)
+    extract<- data$table
+    a <- entrez_search(db = "pubmed", term = paste(extract[,1],collapse = " ") ,use_history = T) 
+    
+    a$QueryTranslation
+    article <- entrez_fetch(db="pubmed",web_history =a$web_history ,rettype ="xml",parsed = T)
+    
+    b <- getNodeSet(article,"//MedlineCitation")
+    print(length(b))
+    mem <- NULL
+    newid <- NULL
+    for (i in 1:length(b)) {
+      bbb <- xmlSerializeHook(b[[i]])
+      bbb <- xmlDeserializeHook(bbb)
+      ttt <- XML::xpathSApply(bbb, "//Abstract", XML::xmlValue)
+      aaa <- XML::xpathSApply(bbb, "///MedlineCitation/PMID[@Version='1']", XML::xmlValue)
+      if(length(ttt)==0) ttt <- "NA"
+      if(length(aaa)==0) aaa <- "NA"
+      ttt <- paste((XML::xpathSApply(bbb, "//ArticleTitle", XML::xmlValue)),ttt)
+      mem<-c(mem,ttt)
+      newid <-c(newid,aaa)
+      print(i)
+    }
+    extract$newid <- newid
+    extract$newabs <- mem
+    data$table <- cbind(extract$newid,extract$newabs)
+    
     sendSweetAlert(
       session = session,
       title = "Done !",
@@ -137,14 +184,17 @@ server <- function(input, output, session) {
   output$test <- renderPrint({"attente tri"})
   data2 <- reactiveValues()
   observeEvent(input$sort, {
+    data$table <- data$table[,1:2]
     lin_av <- "????"
     if (input$radio ==1 ||input$radio == 3 ) { # Predefini OR, RR
       
-      memory <- c(" or ", " rr ", "relative risk"," odd ","odds")
+      memory <- c("OR", "RR", "relative risk","odd","odds","Odd","Odds","Relative risk", "Relative Risk","HR")
       for (i in 1:length(memory)) {
-        data$table[,i+2] <- str_detect(data$table[,2] ,memory[i])
+        print(i)
+        data$table <- cbind(data$table,str_detect(data$table[,2] ,memory[i]))
+        print("zzz")
       }
-      data$table[,length(memory)+3] <- F
+      data$table <- cbind(data$table,F)
       progress <- shiny::Progress$new()
       on.exit(progress$close())
       progress$set(message = "tri database", value = 0)
@@ -157,8 +207,10 @@ server <- function(input, output, session) {
     } 
     if (input$radio == 2) {
       if (input$slider1>0) {
+        data$table <- as.data.frame(data$table)
         memory <- c(input$text1, input$text2, input$text3, input$text4, input$text5,input$text6)
         for (i in 1:input$slider1) {
+          
           data$table[,i+2] <- str_detect(data$table[,2] ,memory[i])
         }
         data$table[,input$slider1+3] <- F
@@ -176,36 +228,44 @@ server <- function(input, output, session) {
     }
     if (input$radio == 3) {
       if (input$slider1>0) {
-        memory <- c(input$text1, input$text2, input$text3, input$text4, input$text5,input$text6)
+        data$table <- as.data.frame(data$table)
+        memory2 <- c(input$text1, input$text2, input$text3, input$text4, input$text5,input$text6)
         for (i in 1:input$slider1) {
-          data$table[,i+8] <- str_detect(data$table[,2] ,memory[i])
+          data$table[,i+length(memory)+3] <- str_detect(data$table[,2] ,memory2[i])
         }
-        data$table[,input$slider1+9] <- F
+        data$table[,input$slider1+1+length(memory)+3] <- F
         progress <- shiny::Progress$new()
         on.exit(progress$close())
         progress$set(message = "tri database", value = 0)
         for (i in 1:input$slider1) {
           for (j in 1:nrow(data$table)) {
-            if (data$table[j,(i+8)]){data$table[j,(input$slider1+9)] <- T}
+            if (data$table[j,(i+length(memory)+3)]){data$table[j,(input$slider1+1+length(memory)+3)] <- T}
             progress$inc(1/(input$slider1*nrow(data$table)), detail = paste("Doing step", i,"part",j))
-            data$table[,(input$slider1+10)]<- (data$table[,(input$slider1+9)] | data$table[,8])
+           
           }
         }
-        
+        print(summary(data$table[,(input$slider1+1+length(memory)+3)]))
+        print("zzzzzzzzzzzzzz")
+        print(summary(data$table[,length(memory)+3]))
+        print("logic")
+        data$table[,length(memory)+3] <- as.logical(data$table[,length(memory)+3])
+        print(summary(data$table[,length(memory)+3]))
+        data$table[,(input$slider1+1+length(memory)+4)]<- (data$table[,(input$slider1+1+length(memory)+3)] | data$table[,length(memory)+3])
       }
     }
     
     if (input$radio == 1) {
-      data2$tri <- subset(data$table, data$table[,8] == T)
+      data2$tri <- subset(data$table, data$table[,(length(memory)+3)] == T)
     }
     if (input$radio == 2) {
       data2$tri <- subset(data$table, data$table[,(input$slider1+3)] == T)
     }
     if (input$radio == 3) {
-      data2$tri <- subset(data$table, data$table[,(input$slider1+10)] == T)
+      data2$tri <- subset(data$table, data$table[,(input$slider1+length(memory)+5)] == T)
     }
     #           names(data2$tri<- c("uid","abstract",memory,"to remove"))
     data2$tri2 <- data2$tri[,1:2]
+
     names(data2$tri2)<- c("Pubmed uID","Title and Abstract")
     sendSweetAlert(
       session = session,

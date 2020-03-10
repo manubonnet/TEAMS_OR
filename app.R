@@ -86,8 +86,8 @@ ui <- fluidPage(
                        # Output: Data file ----
                        # tableOutput("contents"),
                        fluidRow(
-                         radioButtons("radio", label = h3("Choix du tri"),
-                                      choices = list("Predefini (OR, RR...)" = 1, "Personalise" = 2, "les deux" = 3), 
+                         radioButtons("radio", label = h3("Sorting choice:"),
+                                      choices = list("Predefined (OR, RR, HR)" = 1, "Custom" = 2, "Both" = 3), 
                                       selected = 1, inline = T)),
                        fluidRow(
                          conditionalPanel(
@@ -120,7 +120,8 @@ ui <- fluidPage(
                          actionButton(inputId = "sort", label = "tri"),
                          conditionalPanel("input.sort",
                                           h3(textOutput("tri")),
-                                          downloadButton("downloadData", "Download") 
+                                          downloadButton("downloadData", "Download"),
+                                          h4(uiOutput("tab"))
                          )
                        )
       )
@@ -151,7 +152,6 @@ server <- function(input, output, session) {
     name_RF <- str_split(input$file1$name, "_", simplify = TRUE)[2]
     output$name_RF <- renderText(name_RF)
     outputOptions(output, "name_RF", suspendWhenHidden = FALSE)
-    print(name_RF)
     extract<- data$table
     a <- entrez_search(db = "pubmed", term = paste(extract[,1],collapse = " ") ,use_history = T) 
     
@@ -159,7 +159,6 @@ server <- function(input, output, session) {
     article <- entrez_fetch(db="pubmed",web_history =a$web_history ,rettype ="xml",parsed = T)
     
     b <- getNodeSet(article,"//MedlineCitation")
-    print(length(b))
     mem <- NULL
     newid <- NULL
     for (i in 1:length(b)) {
@@ -172,7 +171,6 @@ server <- function(input, output, session) {
       ttt <- paste((XML::xpathSApply(bbb, "//ArticleTitle", XML::xmlValue)),ttt)
       mem<-c(mem,ttt)
       newid <-c(newid,aaa)
-      print(i)
     }
     extract$newid <- newid
     extract$newabs <- mem
@@ -193,11 +191,9 @@ server <- function(input, output, session) {
     lin_av <- "????"
     if (input$radio ==1 ||input$radio == 3 ) { # Predefini OR, RR
       
-      memory <- c("OR", "RR", "relative risk","odd","odds","Odd","Odds","Relative risk", "Relative Risk","HR")
+      memory <- c("OR", "RR", "relative risk","odd","odds","Odd","Odds","Relative risk", "Relative Risk","HR","Hazard Ratio","hazard ratio")
       for (i in 1:length(memory)) {
-        print(i)
         data$table <- cbind(data$table,str_detect(data$table[,2] ,memory[i]))
-        print("zzz")
       }
       data$table <- cbind(data$table,F)
       progress <- shiny::Progress$new()
@@ -249,12 +245,7 @@ server <- function(input, output, session) {
            
           }
         }
-        print(summary(data$table[,(input$slider1+1+length(memory)+3)]))
-        print("zzzzzzzzzzzzzz")
-        print(summary(data$table[,length(memory)+3]))
-        print("logic")
         data$table[,length(memory)+3] <- as.logical(data$table[,length(memory)+3])
-        print(summary(data$table[,length(memory)+3]))
         data$table[,(input$slider1+1+length(memory)+4)]<- (data$table[,(input$slider1+1+length(memory)+3)] | data$table[,length(memory)+3])
       }
     }
@@ -284,7 +275,8 @@ server <- function(input, output, session) {
     date_heure <- str_c(str_sub(date(),start = 12,end = 13),"h", str_sub(date(),start = 15,end = 16))
     name_RF2 <- str_split(input$file1$name, "_", simplify = TRUE)[2]
     name_id <- str_c("shiny.stepOR_",name_RF2,"_",date_jour,"_",date_mois, "_" , date_annee,"_" ,date_heure,".csv")
-    print(name_id)
+    # col.names(data2$tri2)<- c("uid","abstract")
+    # print(head(data2$tri2))
     #name_id <- isolate(name_id)
     output$downloadData <- downloadHandler(
       filename = function() {
@@ -294,6 +286,16 @@ server <- function(input, output, session) {
         write.table(data2$tri2, file, row.names = FALSE, sep = ";")
       }
     )
+    
+    ids <- paste0(data2$tri2[,1],collapse = "+")
+    url_pub <- paste0("https://www.ncbi.nlm.nih.gov/pubmed/?term=",ids)
+    
+    url <- a("PubMed link", href=url_pub)
+    output$tab <- renderUI({
+      tagList("Direct", url,"to see these",nrow(data2$tri),"articles on PubMed website.")
+    })
+    
+   # https://www.ncbi.nlm.nih.gov/pubmed/?term=
     
   })
 
